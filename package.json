@@ -1,0 +1,28 @@
+{
+  "name": "mychart-copilot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered sidebar that helps patients understand their medical documents on MyChart",
+  "workspaces": [
+    "server",
+    "extension"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace=server",
+    "dev:extension": "npm run dev --workspace=extension",
+    "build:extension": "npm run build --workspace=extension",
+    "lint": "eslint .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.1",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0"
+  },
+  "lint-staged": {
+    "*.js": "eslint --fix",
+    "*.jsx": "eslint --fix"
+  }
+}

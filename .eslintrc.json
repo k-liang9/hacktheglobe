@@ -1,0 +1,46 @@
+{
+  "root": true,
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "extends": ["airbnb-base"],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-console": "off",
+    "import/no-unresolved": "off",
+    "import/extensions": "off"
+  },
+  "overrides": [
+    {
+      "files": ["extension/**/*.js"],
+      "env": {
+        "browser": true,
+        "webextensions": true
+      },
+      "rules": {
+        "no-restricted-globals": "off",
+        "import/no-extraneous-dependencies": "off"
+      }
+    },
+    {
+      "files": ["extension/**/*.jsx"],
+      "env": {
+        "browser": true,
+        "webextensions": true
+      },
+      "parserOptions": {
+        "ecmaFeatures": {
+          "jsx": true
+        }
+      },
+      "rules": {
+        "no-unused-vars": "off",
+        "react/jsx-filename-extension": "off"
+      }
+    }
+  ]
+}
