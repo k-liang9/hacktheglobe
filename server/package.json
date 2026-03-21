@@ -1,5 +1,5 @@
 {
-  "name": "mychart-copilot-server",
+  "name": "douglas-ai-server",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,6 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
-    "openai": "^4.77.0",
     "axios": "^1.7.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",

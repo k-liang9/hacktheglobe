@@ -30,11 +30,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     fetch(`${API_BASE}/generate-insight`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language: message.language || 'en' }),
     })
       .then((res) => res.json())
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
-    return true; // keep channel open for async response
+    return true;
+  }
+
+  if (message.type === 'CHAT') {
+    fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: message.messages, language: message.language || 'en' }),
+    })
+      .then((res) => res.json())
+      .then((data) => sendResponse({ ok: true, reply: data.reply }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
   }
 
   if (message.type === 'START_AUTH') {
@@ -56,6 +69,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
       .then((res) => res.json())
       .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'LOGOUT') {
+    fetch(`${API_BASE}/auth/logout`, { method: 'POST' })
+      .then((res) => res.json())
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'CHECK_AUTH') {
+    fetch(`${API_BASE}/auth/status`)
+      .then((res) => res.json())
+      .then((data) => sendResponse({ ok: true, authenticated: data.authenticated }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }

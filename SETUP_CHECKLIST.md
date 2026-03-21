@@ -1,11 +1,12 @@
 # Setup Checklist
 
-Everything you need to do manually to get MyChart Copilot running from zero.
+Everything you need to do manually to get DouglasAI running from zero.
 
 ---
 
 ## 1. Install system prerequisites
 
+- [ ] **Node.js >= 18** — [Download](https://nodejs.org/)
 - [ ] **Docker Desktop** — [Download](https://www.docker.com/products/docker-desktop/)
 - [ ] **Google Chrome** — [Download](https://www.google.com/chrome/)
 
@@ -21,15 +22,8 @@ Everything you need to do manually to get MyChart Copilot running from zero.
 - [ ] Go to **Build Apps** → [Create a New App](https://fhir.epic.com/Developer/Apps)
 - [ ] Set **Application Audience** to **Patients**
 - [ ] Set **Incoming API: SMART on FHIR version** to **R4**
-- [ ] Under **Redirect URIs**, add: `http://localhost:3000/api/auth/callback`
-- [ ] Under **API Access**, select these scopes:
-  - `patient/Patient.read`
-  - `patient/Condition.read`
-  - `patient/MedicationRequest.read`
-  - `patient/Observation.read`
-  - `patient/AllergyIntolerance.read`
-  - `openid`
-  - `fhirUser`
+- [ ] Under **Incoming APIs**, select all R4 Patient Chart items
+- [ ] Under **Redirect URIs**, add: `https://localhost:3443/api/auth/callback`
 - [ ] Save the app and copy the **Client ID** (Non-Production)
 
 ## 4. Configure environment variables
@@ -41,54 +35,75 @@ Everything you need to do manually to get MyChart Copilot running from zero.
 - [ ] Fill in real values:
   - `DEEPSEEK_API_KEY` — from step 2
   - `EPIC_CLIENT_ID` — from step 3
-  - `EPIC_REDIRECT_URI` — leave as `http://localhost:3000/api/auth/callback`
-  - `PORT` — leave as `3000` (or change if needed)
+  - `EPIC_REDIRECT_URI` — set to `https://localhost:3443/api/auth/callback`
+  - `PORT` — leave as `3000`
 
-## 5. Start the entire backend (one command)
+## 5. Start Presidio containers
 
 ```bash
-docker compose up --build
+docker compose up presidio-analyzer presidio-anonymizer -d
 ```
 
-This starts all services and builds the extension in one shot:
-- **extension-build** — builds the Chrome extension, outputs to `extension/dist/`
-- **server** — Express backend on `localhost:3000`
-- **presidio-analyzer** — PHI detection on `localhost:5002`
-- **presidio-anonymizer** — PHI redaction on `localhost:5001`
+- [ ] Wait for containers to become healthy (~30 seconds)
 
-The server waits for Presidio health checks to pass before starting.
+## 6. Install dependencies and start the server
 
-- [ ] Verify the server is running:
-  ```bash
-  curl http://localhost:3000/api/health
-  # Should return: {"ok":true}
+```bash
+npm install
+cd server && node index.js
+```
+
+- [ ] Verify you see:
   ```
-- [ ] Confirm the `extension/dist/` directory was created
+  DouglasAI server (HTTP) running on http://localhost:3000
+  DouglasAI server (HTTPS) running on https://localhost:3443
+  ```
 
-## 6. Load the extension into Chrome
+## 7. Build the Chrome extension
+
+```bash
+npm run build:extension
+```
+
+- [ ] Confirm `extension/dist/` was created
+
+## 8. Trust the self-signed certificate
+
+- [ ] Open `https://localhost:3443/api/health` in Chrome
+- [ ] Click **Advanced** → **Proceed to localhost (unsafe)**
+- [ ] Confirm you see `{"ok":true}`
+
+## 9. Load the extension into Chrome
 
 - [ ] Open `chrome://extensions/` in Chrome
 - [ ] Toggle **Developer mode** ON (top-right corner)
 - [ ] Click **Load unpacked**
 - [ ] Navigate to and select the `extension/dist/` directory
-- [ ] Confirm the MyChart Copilot extension appears in the toolbar
-- [ ] Pin it for easy access (click the puzzle icon → pin MyChart Copilot)
+- [ ] Confirm DouglasAI appears in the toolbar
+- [ ] Pin it for easy access (click the puzzle icon → pin DouglasAI)
 
-## 7. Run a demo
+## 10. Run a demo
 
-- [ ] Navigate to a MyChart portal page (e.g., `mychart.com`)
-- [ ] Click the MyChart Copilot icon in the Chrome toolbar
-- [ ] The sidebar opens and shows a loading spinner
-- [ ] After a few seconds, you should see:
-  - A plain-language **summary** of the current page
-  - A list of **questions** to bring up with your doctor
+- [ ] Navigate to `http://localhost:3000/api/mychart` (built-in MyChart shim)
+- [ ] Click the DouglasAI icon in the Chrome toolbar to open the sidebar
+- [ ] Complete the one-time consent + Epic sign-in flow
+- [ ] After sign-in, refresh the MyChart shim page
+- [ ] Open the sidebar — you should see collapsible sections:
+  - **Document Summary** — with language translation dropdown
+  - **Health Insights** — proactive health observations
+  - **Aftercare Instructions** — medication and self-care guidance
+  - **Ask Your Doctor** — questions for your next visit
+  - **Chat with DouglasAI** — interactive chatbot
+- [ ] Click through the shim tabs (Visits, Messages, Test Results, etc.) and reopen the sidebar to see page-specific insights
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `Connection Error` in sidebar | Make sure the backend server is running on port 3000 |
-| `Presidio unavailable` warning in server logs | Run `docker compose up` — both Presidio containers must be healthy |
-| Extension not appearing | Run `docker compose up extension-build --build` and reload in `chrome://extensions/` |
+| `Connection Error` in sidebar | Make sure the server is running on port 3000 |
+| `Presidio unavailable` warning in server logs | Run `docker compose up presidio-analyzer presidio-anonymizer -d` |
+| Extension not appearing | Rebuild with `npm run build:extension` and reload in `chrome://extensions/` |
+| SSL error on OAuth callback | Visit `https://localhost:3443/api/health` and accept the self-signed cert |
 | OAuth error | Verify `EPIC_CLIENT_ID` and redirect URI match your Epic app config |
 | DeepSeek API error | Check your `DEEPSEEK_API_KEY` is valid and has credits |
+| Sidebar shows empty sections | Check server terminal for errors — DeepSeek may be rate-limiting |

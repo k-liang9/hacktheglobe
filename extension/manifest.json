@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "MyChart Copilot",
+  "name": "DouglasAI",
   "version": "1.0.0",
   "description": "AI-powered sidebar that helps patients understand their medical documents on MyChart",
   "permissions": [
@@ -21,7 +21,8 @@
     {
       "matches": [
         "https://*.mychart.com/*",
-        "https://*.mychart.org/*"
+        "https://*.mychart.org/*",
+        "http://localhost:3000/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -31,7 +32,7 @@
     "default_path": "sidebar/sidebar.html"
   },
   "action": {
-    "default_title": "MyChart Copilot",
+    "default_title": "DouglasAI",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

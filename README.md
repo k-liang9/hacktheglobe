@@ -1,6 +1,16 @@
-# MyChart Copilot
+# DouglasAI
 
-An AI-powered Chrome extension sidebar that helps patients understand their medical documents on MyChart. It connects to the Epic FHIR API for medical history, de-identifies all PHI via Microsoft Presidio before sending anything to an LLM, and generates plain-language summaries with actionable questions to raise with your doctor.
+An AI-powered Chrome extension sidebar that helps patients understand their medical documents on MyChart. It connects to the Epic FHIR API for medical history, de-identifies all PHI via Microsoft Presidio before sending anything to an LLM, and generates plain-language summaries, health insights, aftercare instructions, and an interactive chatbot — all in the patient's preferred language.
+
+## Features
+
+- **Document Summary** — plain-language explanation of the current page, with translation to 11 languages
+- **Health Insights** — proactive flags on concerning lab values, drug interactions, and trends
+- **Aftercare Instructions** — medication timing, symptoms to watch for, lifestyle guidance
+- **Ask Your Doctor** — generated questions to bring up at your next visit
+- **Chat with DouglasAI** — conversational chatbot with full patient context
+- **Consent + OAuth onboarding** — one-time consent form and Epic MyChart sign-in
+- **MyChart shim** — built-in demo site with visits, messages, lab results, medications, and billing
 
 ## Architecture
 
@@ -15,16 +25,16 @@ Patient browser          Backend server              External services
 │               │   │  Context store       │   │                     │
 │ Extension     │──▶│        ▼             │   │                     │
 │ opened        │   │  Prompt builder      │──▶│  LLM inference      │
-│               │   │  (page ctx+history)  │   │  (BAA-covered,      │
+│               │   │  (page ctx+history)  │   │  (DeepSeek V3.2,    │
 │ Insight panel │◀──│                      │◀──│   no PHI)           │
-│ (summary +    │   │                      │   │                     │
-│  issues)      │   │                      │   │                     │
+│ + Chatbot     │   │                      │   │                     │
 └──────────────┘   └──────────────────────┘   └─────────────────────┘
 ```
 
 ## Prerequisites
 
-- **Docker + Docker Compose** (runs everything)
+- **Node.js** >= 18 (for building the extension and running the server locally)
+- **Docker** (for Presidio de-identification containers)
 - **Google Chrome** (for loading the extension)
 - **Epic Sandbox Account** (for FHIR API access)
 - **DeepSeek API Key** (for DeepSeek V3.2)
@@ -35,65 +45,74 @@ Patient browser          Backend server              External services
 
 ```bash
 git clone <repo-url>
-cd mychart-copilot
+cd douglas-ai
 cp .env.example .env
 # Edit .env with your actual keys:
 #   DEEPSEEK_API_KEY  - from https://platform.deepseek.com/api_keys
 #   EPIC_CLIENT_ID    - from https://fhir.epic.com/Developer/Apps
 ```
 
-### 2. Build and start everything
+### 2. Start Presidio (de-identification)
 
 ```bash
-docker compose up --build
+docker compose up presidio-analyzer presidio-anonymizer -d
 ```
 
-This builds and starts all services:
-- **extension-build** — builds the Chrome extension, outputs to `extension/dist/`
-- **server** — Express backend on `:3000`
-- **presidio-analyzer** — PHI detection on `:5002`
-- **presidio-anonymizer** — PHI redaction on `:5001`
-
-Verify with:
+### 3. Install dependencies and start the server
 
 ```bash
-curl http://localhost:3000/api/health
-# → {"ok": true}
+npm install
+cd server && node index.js
 ```
 
-### 3. Load the extension in Chrome
+The server starts on HTTP `:3000` and HTTPS `:3443` (for Epic OAuth callback).
+
+### 4. Build and load the Chrome extension
+
+```bash
+npm run build:extension
+```
 
 1. Open `chrome://extensions/`
 2. Enable **Developer mode** (top right)
-3. Click **Load unpacked**
-4. Select the `extension/dist/` directory
-5. The MyChart Copilot icon appears in the toolbar
+3. Click **Load unpacked** → select `extension/dist/`
+4. Visit `https://localhost:3443/api/health` in Chrome and click "Proceed to localhost" to trust the self-signed cert
 
 ## Demo
 
-1. Run `docker compose up --build` (builds extension + starts server + Presidio)
-2. Navigate to a MyChart page (or any page for testing)
-3. Click the MyChart Copilot extension icon to open the sidebar
-4. The extension sends the current page content to the backend
-5. The backend de-identifies the text, builds a prompt with FHIR context, and calls DeepSeek
-6. The sidebar displays a plain-language summary and a list of questions for the doctor
+1. Start Presidio and the server (steps 2-3 above)
+2. Navigate to `http://localhost:3000/api/mychart` (built-in MyChart shim)
+3. Click the DouglasAI extension icon to open the sidebar
+4. Complete the one-time consent + Epic sign-in flow
+5. Browse the MyChart shim pages — the sidebar generates context-aware insights for each page
+6. Use the chatbot to ask questions about your health records
+
+### MyChart Shim Pages
+
+- `/api/mychart` — Health Summary
+- `/api/mychart/visits` — Visit notes with full writeups + imaging
+- `/api/mychart/messages` — Patient-provider message threads
+- `/api/mychart/results` — Lab results with reference ranges
+- `/api/mychart/medications` — Active medications + history
+- `/api/mychart/billing` — Billing statements + insurance
 
 ## Project Structure
 
 ```
-mychart-copilot/
-├── server/           # Express backend
-│   ├── index.js      # Server entry point
-│   ├── auth.js       # SMART on FHIR OAuth with PKCE
-│   ├── fhir.js       # Epic FHIR data fetching
-│   ├── deidentify.js # Presidio PHI stripping
-│   ├── context.js    # In-memory session store
-│   ├── inference.js  # DeepSeek prompt building + API call
-│   └── routes.js     # Express routes
-├── extension/        # Chrome extension (Manifest V3)
-│   ├── manifest.json
-│   ├── content.js    # Page tracker
-│   ├── background.js # Service worker
-│   └── sidebar/      # React sidebar UI
-└── package.json      # Monorepo root with workspaces
+douglas-ai/
+├── server/
+│   ├── index.js        # Express server (HTTP + HTTPS)
+│   ├── auth.js         # SMART on FHIR OAuth with PKCE
+│   ├── fhir.js         # Epic FHIR data fetching
+│   ├── deidentify.js   # Presidio PHI stripping
+│   ├── context.js      # In-memory session store
+│   ├── inference.js    # DeepSeek prompt building + chat
+│   ├── routes.js       # Express routes
+│   └── shim.js         # MyChart demo site
+├── extension/
+│   ├── manifest.json   # MV3 manifest
+│   ├── content.js      # Page tracker
+│   ├── background.js   # Service worker
+│   └── sidebar/        # React sidebar UI
+└── package.json        # Monorepo root with workspaces
 ```

@@ -1,8 +1,8 @@
 {
-  "name": "mychart-copilot",
+  "name": "douglas-ai",
   "version": "1.0.0",
   "private": true,
-  "description": "AI-powered sidebar that helps patients understand their medical documents on MyChart",
+  "description": "AI-powered sidebar that helps patients understand their medical documents on MyChart — DouglasAI",
   "workspaces": [
     "server",
     "extension"
