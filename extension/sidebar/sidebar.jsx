@@ -171,6 +171,43 @@ function AftercareSublist({
   );
 }
 
+function MedTimeline({ schedule }) {
+  if (!schedule || !schedule.length) return null;
+  return (
+    <div className="mb-3">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        Daily Medication Schedule
+      </p>
+      <div className="relative pl-4 border-l-2 border-blue-200 space-y-4">
+        {schedule.map((slot, i) => (
+          <div key={i} className="relative">
+            <div className="absolute -left-[21px] top-0.5 h-3 w-3 rounded-full bg-blue-500 border-2 border-white" />
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-xs font-bold text-blue-600">
+                {slot.time}
+              </span>
+              <span className="text-xs font-semibold text-gray-800">
+                {slot.label}
+              </span>
+            </div>
+            <ul className="space-y-0.5">
+              {(slot.meds || []).map((med, j) => (
+                <li
+                  key={j}
+                  className="text-sm text-gray-600 flex items-start gap-1.5"
+                >
+                  <span className="text-blue-400 mt-1">•</span>
+                  {med}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AftercareSection({ aftercare }) {
   const ac = aftercare || {};
   const meds = ac.medication_schedule || [];
@@ -187,12 +224,7 @@ function AftercareSection({ aftercare }) {
     >
       {hasContent ? (
         <div>
-          <AftercareSublist
-            label="Medication Schedule"
-            items={meds}
-            icon={HeartPulse}
-            iconColor="text-blue-400"
-          />
+          <MedTimeline schedule={meds} />
           <AftercareSublist
             label="Symptoms to Monitor"
             items={symptoms}

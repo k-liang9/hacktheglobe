@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { z } = require('zod');
 const context = require('./context');
+const { enrichFhirData } = require('./supplement');
 
 const FHIR_BASE = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4';
 
@@ -40,13 +41,14 @@ async function fetchAllPatientData() {
     fetchBundle('AllergyIntolerance'),
   ]);
 
-  const fhirData = {
+  const rawData = {
     conditions,
     medications,
     observations,
     allergies,
   };
 
+  const fhirData = enrichFhirData(rawData);
   context.set('fhirData', fhirData);
   return fhirData;
 }
@@ -88,6 +90,39 @@ function summarizeFhirData(fhirData) {
       .map((a) => a.code?.text || a.code?.coding?.[0]?.display || 'Unknown')
       .join(', ');
     parts.push(`Allergies: ${items}`);
+  }
+
+  if (fhirData.observations.length > 10) {
+    // Include lab trends for key markers
+    const trendNames = [
+      'Creatinine', 'eGFR', 'Hemoglobin A1c',
+      'Systolic Blood Pressure', 'ALT', 'Potassium',
+    ];
+    const trends = trendNames.map((name) => {
+      const vals = fhirData.observations
+        .filter((o) => (o.code?.text || '') === name)
+        .sort((a, b) => (a.effectiveDateTime || '')
+          .localeCompare(b.effectiveDateTime || ''));
+      if (vals.length < 2) return null;
+      const points = vals.map((v) => {
+        const d = v.effectiveDateTime
+          ? v.effectiveDateTime.slice(0, 10) : '?';
+        const val = v.valueQuantity
+          ? `${v.valueQuantity.value}` : '?';
+        return `${d}: ${val}`;
+      }).join(' → ');
+      return `${name} trend: ${points} ${vals[0].valueQuantity?.unit || ''}`;
+    }).filter(Boolean);
+    if (trends.length) {
+      parts.push(`Lab trends over time:\n${trends.join('\n')}`);
+    }
+  }
+
+  if (fhirData.visits && fhirData.visits.length) {
+    const visitSummaries = fhirData.visits.map(
+      (v) => `${v.date} — ${v.type} (${v.provider}): ${v.summary.slice(0, 300)}...`,
+    ).join('\n\n');
+    parts.push(`Recent visit notes:\n${visitSummaries}`);
   }
 
   return parts.join('\n\n');

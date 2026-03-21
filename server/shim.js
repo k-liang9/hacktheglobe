@@ -225,120 +225,28 @@ router.get('/', (req, res) => {
 router.get('/visits', (req, res) => {
   if (!requireAuth(req, res)) return;
 
-  const conditions = getConditions();
-  const meds = getMedications();
+  const fhirData = context.get('fhirData');
+  const visitList = fhirData?.visits || [];
+
+  const visitCards = visitList.map((v) => `
+    <div class="card">
+      <div class="card-header">
+        <h3>${v.type}</h3>
+        <span class="date">${v.date}</span>
+      </div>
+      <div class="card-body">
+        <p class="section-label">Provider</p>
+        <p>${v.provider}${v.location ? `<br/>${v.location}` : ''}</p>
+        <p class="section-label">Visit Summary</p>
+        <div class="writeup">${v.summary}</div>
+      </div>
+    </div>
+  `).join('');
 
   res.send(layout('Visits', 'Visits', `
     <h2 class="page-title">Visit History</h2>
     <p class="page-subtitle">Your recent and upcoming appointments</p>
-
-    <div class="card">
-      <div class="card-header">
-        <h3>Office Visit — Primary Care</h3>
-        <span class="date">March 15, 2026</span>
-      </div>
-      <div class="card-body">
-        <p class="section-label">Provider</p>
-        <p>Dr. Sarah Chen, MD — Internal Medicine<br/>Evergreen Medical Center, Suite 204</p>
-
-        <p class="section-label">Visit Summary</p>
-        <div class="writeup">Patient presents for routine follow-up and management of chronic conditions. Reports compliance with current medication regimen. Denies any new complaints, chest pain, shortness of breath, or changes in weight.
-
-${conditions.length ? `Active conditions reviewed: ${conditions.map((c) => c.name).join(', ')}. ` : ''}${meds.length ? `Current medications reviewed and reconciled: ${meds.slice(0, 3).map((m) => m.name).join(', ')}.` : ''}
-
-Vital Signs:
-  Blood Pressure: 128/82 mmHg
-  Heart Rate: 76 bpm
-  Temperature: 98.4°F
-  Weight: 185 lbs
-  BMI: 27.3
-
-Physical Examination:
-  General: Well-appearing, no acute distress
-  HEENT: Normocephalic, atraumatic. Pupils equal and reactive.
-  Cardiovascular: Regular rate and rhythm, no murmurs
-  Respiratory: Clear to auscultation bilaterally
-  Abdomen: Soft, non-tender, non-distended
-  Extremities: No edema, pulses 2+ bilaterally
-
-Assessment & Plan:
-  1. Continue current medication regimen
-  2. Follow up on recent lab results — some values require monitoring
-  3. Continue lifestyle modifications: diet and exercise counseling provided
-  4. Return in 3 months for follow-up, sooner if any concerns arise
-  5. Referral to cardiology if blood pressure remains elevated at next visit</div>
-
-        <p class="section-label">After Visit Summary</p>
-        <p>Your lab work from today's visit will be available in Test Results within 3-5 business days. Please continue taking all medications as prescribed. Call our office if you experience any concerning symptoms.</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <h3>Radiology — Chest X-Ray</h3>
-        <span class="date">February 28, 2026</span>
-      </div>
-      <div class="card-body">
-        <p class="section-label">Provider</p>
-        <p>Dr. Michael Torres, MD — Radiology<br/>Evergreen Medical Center, Imaging Dept</p>
-
-        <p class="section-label">Imaging Report</p>
-        <div class="writeup">CHEST X-RAY, PA AND LATERAL
-
-CLINICAL INDICATION: Routine screening, history of chronic cough
-
-COMPARISON: Chest X-ray dated September 12, 2025
-
-FINDINGS:
-Heart size is normal. Mediastinal contours are unremarkable. The lungs are clear without focal consolidation, pleural effusion, or pneumothorax. No acute osseous abnormalities. The visualized soft tissues are unremarkable.
-
-IMPRESSION:
-1. No acute cardiopulmonary disease
-2. No significant change from prior examination</div>
-
-        <div class="img-placeholder">
-          <svg width="280" height="340" viewBox="0 0 280 340" xmlns="http://www.w3.org/2000/svg">
-            <rect width="280" height="340" rx="4" fill="#1a202c"/>
-            <rect x="40" y="20" width="200" height="260" rx="8" fill="#2d3748" opacity="0.8"/>
-            <!-- Ribcage outline -->
-            <ellipse cx="140" cy="120" rx="70" ry="90" fill="none" stroke="#4a5568" stroke-width="1.5"/>
-            <!-- Ribs -->
-            <path d="M85 70 Q140 60 195 70" fill="none" stroke="#4a5568" stroke-width="1"/>
-            <path d="M80 90 Q140 78 200 90" fill="none" stroke="#4a5568" stroke-width="1"/>
-            <path d="M78 110 Q140 96 202 110" fill="none" stroke="#4a5568" stroke-width="1"/>
-            <path d="M78 130 Q140 116 202 130" fill="none" stroke="#4a5568" stroke-width="1"/>
-            <path d="M80 150 Q140 136 200 150" fill="none" stroke="#4a5568" stroke-width="1"/>
-            <path d="M85 170 Q140 156 195 170" fill="none" stroke="#4a5568" stroke-width="1"/>
-            <!-- Heart -->
-            <ellipse cx="130" cy="135" rx="30" ry="35" fill="#2d3748" stroke="#4a5568" stroke-width="1.5"/>
-            <!-- Spine -->
-            <line x1="140" y1="30" x2="140" y2="270" stroke="#4a5568" stroke-width="2"/>
-            <!-- Label -->
-            <text x="20" y="295" fill="#718096" font-size="10" font-family="monospace">PA VIEW</text>
-            <text x="200" y="295" fill="#718096" font-size="10" font-family="monospace">02/28/26</text>
-          </svg>
-          <div class="img-label">Chest X-Ray, PA View — No acute findings</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <h3>Telehealth — Follow-up</h3>
-        <span class="date">January 10, 2026</span>
-      </div>
-      <div class="card-body">
-        <p class="section-label">Provider</p>
-        <p>Dr. Sarah Chen, MD — Internal Medicine</p>
-
-        <p class="section-label">Visit Summary</p>
-        <div class="writeup">Telehealth follow-up visit. Patient reports feeling well overall. Reviewed recent lab results and discussed adjustments to care plan.
-
-Patient counseled on importance of regular exercise (goal: 150 min/week moderate activity) and dietary modifications (reduced sodium intake, increased fruit/vegetable consumption).
-
-Flu vaccine recommended and scheduled for next in-person visit. No changes to current medications at this time.</div>
-      </div>
-    </div>
+    ${visitCards || '<p class="empty">No visit history available.</p>'}
   `));
 });
 

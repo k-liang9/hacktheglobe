@@ -71,7 +71,13 @@ You MUST respond with valid JSON in this exact format:
   "summary": "A plain-language summary of the current document",
   "insights": ["Proactive observation 1 about test results or health data", "Observation 2", ...],
   "aftercare": {
-    "medication_schedule": ["Medication 1: dosage and when to take it", "Medication 2: dosage and when to take it", ...],
+    "medication_schedule": [
+      {"time": "6:30 AM", "label": "Wake up", "meds": ["Omeprazole 20mg — on empty stomach"]},
+      {"time": "7:00 AM", "label": "Breakfast", "meds": ["Metformin 500mg — with food", "Lisinopril 10mg"]},
+      {"time": "12:00 PM", "label": "Lunch", "meds": ["Ibuprofen 400mg — with food, if needed for pain"]},
+      {"time": "6:00 PM", "label": "Dinner", "meds": ["Metformin 500mg — with food", "Amlodipine 5mg"]},
+      {"time": "9:00 PM", "label": "Bedtime", "meds": ["Atorvastatin 20mg"]}
+    ],
     "symptoms_to_monitor": ["Symptom 1 to watch for and when to seek care", "Symptom 2", ...],
     "daily_reminders": ["Stay hydrated — drink 8 glasses of water daily", "Reminder 2", ...]
   },
@@ -101,7 +107,7 @@ Please analyze the current document and provide:
 1. "summary": A clear, plain-language summary of what this document says
 2. "insights": Proactive observations about the patient's health data — flag any concerning lab values, potential drug interactions, trends worth noting, or anything the patient should be aware of based on their conditions and medications
 3. "aftercare": An object with three subsections:
-   - "medication_schedule": A daily schedule of when the patient should take each active medication, with dosage info. Be specific about timing (morning, evening, with food, etc.)
+   - "medication_schedule": An array of time-slot objects for a full daily schedule. Each object has: "time" (e.g. "6:30 AM"), "label" (e.g. "Wake up", "Breakfast", "Lunch", "Dinner", "Bedtime"), and "meds" (array of medication instructions for that slot). Order medications by when they must be taken, accounting for spacing rules (e.g. Omeprazole 30min before food). Group medications into ~5 time slots across the day. Include specific dosage and any instructions (with food, empty stomach, etc.).
    - "symptoms_to_monitor": Symptoms the patient should watch for given their conditions and medications, and when to seek urgent care
    - "daily_reminders": General wellness reminders like hydration, exercise, sleep — keep these practical and relevant to their conditions. Do NOT include appointment logistics, prescription pickups, or insurance reminders.
 4. "issues": Questions or important points the patient should raise with their doctor at their next visit

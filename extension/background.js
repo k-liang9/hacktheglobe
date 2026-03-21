@@ -8,45 +8,16 @@ const API_BASE = 'http://localhost:3000/api';
 
 // ── Medication reminder scheduling ─────────────────────────────
 
-const TIME_KEYWORDS = {
-  morning: { hour: 8, label: 'Morning' },
-  breakfast: { hour: 8, label: 'Breakfast' },
-  'with breakfast': { hour: 8, label: 'Breakfast' },
-  noon: { hour: 12, label: 'Lunchtime' },
-  lunch: { hour: 12, label: 'Lunchtime' },
-  lunchtime: { hour: 12, label: 'Lunchtime' },
-  midday: { hour: 12, label: 'Lunchtime' },
-  afternoon: { hour: 14, label: 'Afternoon' },
-  evening: { hour: 18, label: 'Evening' },
-  dinner: { hour: 18, label: 'Dinner' },
-  'with dinner': { hour: 18, label: 'Dinner' },
-  night: { hour: 21, label: 'Bedtime' },
-  bedtime: { hour: 21, label: 'Bedtime' },
-  'before bed': { hour: 21, label: 'Bedtime' },
-};
-
-function parseTimeFromText(text) {
-  const lower = text.toLowerCase();
-  const times = [];
-
-  Object.entries(TIME_KEYWORDS).forEach(([keyword, info]) => {
-    if (lower.includes(keyword)) {
-      times.push(info);
-    }
-  });
-
-  // If no keyword matched, default to morning
-  if (!times.length) {
-    times.push({ hour: 9, label: 'Daily' });
-  }
-
-  // Deduplicate by hour
-  const seen = new Set();
-  return times.filter((t) => {
-    if (seen.has(t.hour)) return false;
-    seen.add(t.hour);
-    return true;
-  });
+function parseTimeString(timeStr) {
+  // Parse "6:30 AM", "12:00 PM", etc.
+  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return { hour, minute };
 }
 
 function scheduleReminders(medSchedule) {
@@ -58,36 +29,39 @@ function scheduleReminders(medSchedule) {
       }
     });
 
-    // Schedule new ones
-    medSchedule.forEach((med, i) => {
-      const times = parseTimeFromText(med);
-      times.forEach((t) => {
-        const now = new Date();
-        const target = new Date();
-        target.setHours(t.hour, 0, 0, 0);
+    // Schedule from structured time slots
+    // Each slot: { time: "6:30 AM", label: "Wake up", meds: [...] }
+    medSchedule.forEach((slot, i) => {
+      const parsed = parseTimeString(slot.time || '');
+      if (!parsed) return;
 
-        // If time already passed today, schedule for tomorrow
-        if (target <= now) {
-          target.setDate(target.getDate() + 1);
-        }
+      const now = new Date();
+      const target = new Date();
+      target.setHours(parsed.hour, parsed.minute, 0, 0);
 
-        const delayMs = target.getTime() - now.getTime();
-        const alarmName = `med-${i}-${t.hour}`;
+      // If time already passed today, schedule for tomorrow
+      if (target <= now) {
+        target.setDate(target.getDate() + 1);
+      }
 
-        chrome.alarms.create(alarmName, {
-          delayInMinutes: delayMs / 60000,
-          periodInMinutes: 24 * 60, // repeat daily
-        });
+      const delayMs = target.getTime() - now.getTime();
+      const alarmName = `med-${i}-${parsed.hour}${parsed.minute}`;
 
-        // Store the med text for the notification
-        chrome.storage.local.get('med_alarms', (result) => {
-          const mapping = result.med_alarms || {};
-          mapping[alarmName] = {
-            med,
-            timeLabel: t.label,
-          };
-          chrome.storage.local.set({ med_alarms: mapping });
-        });
+      chrome.alarms.create(alarmName, {
+        delayInMinutes: delayMs / 60000,
+        periodInMinutes: 24 * 60, // repeat daily
+      });
+
+      // Store details for the notification
+      const medList = (slot.meds || []).join('\n• ');
+      chrome.storage.local.get('med_alarms', (result) => {
+        const mapping = result.med_alarms || {};
+        mapping[alarmName] = {
+          label: slot.label || 'Medication',
+          time: slot.time,
+          message: `• ${medList}`,
+        };
+        chrome.storage.local.set({ med_alarms: mapping });
       });
     });
   });
@@ -105,8 +79,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     chrome.notifications.create(alarm.name, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
-      title: `${info.timeLabel} Medication Reminder`,
-      message: info.med,
+      title: `${info.time} — ${info.label}`,
+      message: info.message,
       priority: 2,
       requireInteraction: true,
     });
