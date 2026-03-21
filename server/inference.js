@@ -70,7 +70,11 @@ You MUST respond with valid JSON in this exact format:
 {
   "summary": "A plain-language summary of the current document",
   "insights": ["Proactive observation 1 about test results or health data", "Observation 2", ...],
-  "aftercare": ["Aftercare instruction 1 (medication timing, symptoms to watch, etc.)", "Instruction 2", ...],
+  "aftercare": {
+    "medication_schedule": ["Medication 1: dosage and when to take it", "Medication 2: dosage and when to take it", ...],
+    "symptoms_to_monitor": ["Symptom 1 to watch for and when to seek care", "Symptom 2", ...],
+    "daily_reminders": ["Stay hydrated — drink 8 glasses of water daily", "Reminder 2", ...]
+  },
   "issues": ["Question to discuss with doctor 1", "Question 2", ...]
 }`;
 
@@ -96,7 +100,10 @@ ${deidentifiedHistory}
 Please analyze the current document and provide:
 1. "summary": A clear, plain-language summary of what this document says
 2. "insights": Proactive observations about the patient's health data — flag any concerning lab values, potential drug interactions, trends worth noting, or anything the patient should be aware of based on their conditions and medications
-3. "aftercare": Practical self-care instructions — how/when to take active medications, symptoms to watch out for given their conditions, lifestyle recommendations, and when to seek urgent care
+3. "aftercare": An object with three subsections:
+   - "medication_schedule": A daily schedule of when the patient should take each active medication, with dosage info. Be specific about timing (morning, evening, with food, etc.)
+   - "symptoms_to_monitor": Symptoms the patient should watch for given their conditions and medications, and when to seek urgent care
+   - "daily_reminders": General wellness reminders like hydration, exercise, sleep — keep these practical and relevant to their conditions. Do NOT include appointment logistics, prescription pickups, or insurance reminders.
 4. "issues": Questions or important points the patient should raise with their doctor at their next visit
 ${languageInstruction}
 Respond with JSON only.`;
@@ -108,10 +115,15 @@ Respond with JSON only.`;
 
   const parsed = parseJSON(text);
   if (parsed) {
+    const ac = parsed.aftercare || {};
     return {
       summary: parsed.summary || '',
       insights: parsed.insights || [],
-      aftercare: parsed.aftercare || [],
+      aftercare: {
+        medication_schedule: ac.medication_schedule || [],
+        symptoms_to_monitor: ac.symptoms_to_monitor || [],
+        daily_reminders: ac.daily_reminders || [],
+      },
       issues: parsed.issues || [],
       pageTitle: currentPage?.title || 'Unknown page',
     };
@@ -120,7 +132,7 @@ Respond with JSON only.`;
   return {
     summary: text,
     insights: [],
-    aftercare: [],
+    aftercare: { medication_schedule: [], symptoms_to_monitor: [], daily_reminders: [] },
     issues: ['Could not parse structured response — showing raw output above.'],
     pageTitle: currentPage?.title || 'Unknown page',
   };

@@ -150,21 +150,66 @@ function InsightsSection({ insights }) {
 
 // ── Aftercare ───────────────────────────────────────────────────
 
-function AftercareSection({ aftercare }) {
-  const items = aftercare || [];
+function AftercareSublist({
+  label, items, icon: Icon, iconColor,
+}) {
+  if (!items || !items.length) return null;
   return (
-    <CollapsibleSection icon={HeartPulse} iconColor="text-rose-500" title="Aftercare Instructions" defaultOpen={false}>
-      {items.length ? (
-        <ul className="space-y-2">
-          {items.map((item, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-              <span className="text-sm text-gray-700">{item}</span>
-            </li>
-          ))}
-        </ul>
+    <div className="mb-3 last:mb-0">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+        {label}
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <Icon className={`h-3.5 w-3.5 ${iconColor} mt-0.5 shrink-0`} />
+            <span className="text-sm text-gray-700">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function AftercareSection({ aftercare }) {
+  const ac = aftercare || {};
+  const meds = ac.medication_schedule || [];
+  const symptoms = ac.symptoms_to_monitor || [];
+  const reminders = ac.daily_reminders || [];
+  const hasContent = meds.length || symptoms.length || reminders.length;
+
+  return (
+    <CollapsibleSection
+      icon={HeartPulse}
+      iconColor="text-rose-500"
+      title="Aftercare Instructions"
+      defaultOpen={false}
+    >
+      {hasContent ? (
+        <div>
+          <AftercareSublist
+            label="Medication Schedule"
+            items={meds}
+            icon={HeartPulse}
+            iconColor="text-blue-400"
+          />
+          <AftercareSublist
+            label="Symptoms to Monitor"
+            items={symptoms}
+            icon={AlertCircle}
+            iconColor="text-amber-400"
+          />
+          <AftercareSublist
+            label="Daily Reminders"
+            items={reminders}
+            icon={CheckCircle2}
+            iconColor="text-green-400"
+          />
+        </div>
       ) : (
-        <p className="text-sm text-gray-400 italic">No aftercare instructions for this page.</p>
+        <p className="text-sm text-gray-400 italic">
+          No aftercare instructions for this page.
+        </p>
       )}
     </CollapsibleSection>
   );
@@ -436,16 +481,56 @@ function App() {
       });
       setInsight(response);
       setState('ready');
+
+      // Schedule medication reminders from aftercare data
+      const meds = response.aftercare?.medication_schedule;
+      if (meds && meds.length) {
+        chrome.runtime.sendMessage({
+          type: 'SET_MED_REMINDERS',
+          schedule: meds,
+        });
+      }
     } catch (err) {
       setError(err.message || 'Could not connect to the server.');
       setState('error');
     }
   }
 
+  async function refreshSummary(lang) {
+    setTranslating(true);
+    try {
+      const response = await new Promise((resolve, reject) => {
+        const msg = {
+          type: 'GENERATE_INSIGHT',
+          language: lang || language,
+        };
+        chrome.runtime.sendMessage(msg, (res) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!res || !res.ok) {
+            reject(new Error(res?.error || 'Failed to refresh'));
+            return;
+          }
+          resolve(res.data);
+        });
+      });
+      setInsight((prev) => ({
+        ...prev,
+        summary: response.summary,
+        pageTitle: response.pageTitle,
+      }));
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   function handleLanguageChange(newLang) {
     setLanguage(newLang);
-    setTranslating(true);
-    fetchInsight(newLang).finally(() => setTranslating(false));
+    refreshSummary(newLang);
   }
 
   function handleLogout() {
@@ -490,7 +575,7 @@ function App() {
               pageTitle={insight.pageTitle}
               language={language}
               onLanguageChange={handleLanguageChange}
-              onRefresh={() => fetchInsight()}
+              onRefresh={() => refreshSummary()}
               loading={translating}
             />
             <InsightsSection insights={insight.insights} />

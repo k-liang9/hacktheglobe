@@ -7,7 +7,9 @@
     "activeTab",
     "scripting",
     "storage",
-    "sidePanel"
+    "sidePanel",
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "https://*.mychart.com/*",
