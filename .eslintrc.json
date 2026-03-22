@@ -27,6 +27,12 @@
       }
     },
     {
+      "files": ["server/__tests__/**/*.js"],
+      "env": {
+        "jest": true
+      }
+    },
+    {
       "files": ["extension/**/*.jsx"],
       "env": {
         "browser": true,
