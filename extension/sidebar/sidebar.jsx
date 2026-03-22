@@ -12,12 +12,12 @@ import {
   LogOut,
   Globe,
   MessageCircle,
-  Lightbulb,
   HeartPulse,
   Send,
   ChevronDown,
   ChevronUp,
   User,
+  CalendarClock,
   Bot,
 } from 'lucide-react';
 import './sidebar.css';
@@ -72,12 +72,17 @@ function ErrorState({ message, onRetry }) {
 }
 
 function CollapsibleSection({
-  icon: Icon, iconColor, title, badge, children, defaultOpen = true,
+  icon: Icon, iconColor, title, badge, children, defaultOpen = true, onOpen,
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  function handleToggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && onOpen) onOpen();
+  }
   return (
     <Card>
-      <button type="button" onClick={() => setOpen(!open)}
+      <button type="button" onClick={handleToggle}
         className="w-full flex items-center gap-2 p-4 text-left hover:bg-gray-50 transition-colors">
         <Icon className={`h-4 w-4 ${iconColor}`} />
         <h2 className="text-sm font-semibold text-gray-900 flex-1">{title}</h2>
@@ -114,7 +119,14 @@ function SummarySection({
         {loading && <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />}
       </div>
 
-      <p className="text-sm text-gray-700 leading-relaxed">{summary}</p>
+      {loading ? (
+        <div className="flex items-center gap-2 py-4 justify-center">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
+          <p className="text-sm text-gray-400">Generating summary...</p>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-700 leading-relaxed">{summary}</p>
+      )}
 
       <div className="flex justify-end mt-3">
         <button type="button" onClick={onRefresh}
@@ -122,28 +134,6 @@ function SummarySection({
           <RefreshCw className="h-3 w-3" /> Refresh
         </button>
       </div>
-    </CollapsibleSection>
-  );
-}
-
-// ── Insights ────────────────────────────────────────────────────
-
-function InsightsSection({ insights }) {
-  const items = insights || [];
-  return (
-    <CollapsibleSection icon={Lightbulb} iconColor="text-amber-500" title="Health Insights" badge={items.length ? `${items.length}` : null} defaultOpen={false}>
-      {items.length ? (
-        <ul className="space-y-2">
-          {items.map((item, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <Lightbulb className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
-              <span className="text-sm text-gray-700">{item}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-gray-400 italic">No insights available for this page.</p>
-      )}
     </CollapsibleSection>
   );
 }
@@ -213,7 +203,26 @@ function AftercareSection({ aftercare }) {
   const meds = ac.medication_schedule || [];
   const symptoms = ac.symptoms_to_monitor || [];
   const reminders = ac.daily_reminders || [];
-  const hasContent = meds.length || symptoms.length || reminders.length;
+  const followups = ac.follow_up_appointments || [];
+  const hasContent = meds.length || symptoms.length
+    || reminders.length || followups.length;
+
+  function triggerDemoNotification() {
+    // Find the dinner slot, or fall back to the last slot
+    const dinnerSlot = meds.find(
+      (s) => (s.label || '').toLowerCase().includes('dinner'),
+    ) || meds[meds.length - 1];
+    if (!dinnerSlot) return;
+
+    const medList = (dinnerSlot.meds || []).join('\n• ');
+    setTimeout(() => {
+      chrome.runtime.sendMessage({
+        type: 'DEMO_NOTIFICATION',
+        title: `${dinnerSlot.time} — ${dinnerSlot.label}`,
+        message: `• ${medList}`,
+      });
+    }, 2000);
+  }
 
   return (
     <CollapsibleSection
@@ -221,21 +230,22 @@ function AftercareSection({ aftercare }) {
       iconColor="text-rose-500"
       title="Aftercare Instructions"
       defaultOpen={false}
+      onOpen={triggerDemoNotification}
     >
       {hasContent ? (
         <div>
           <MedTimeline schedule={meds} />
           <AftercareSublist
             label="Symptoms to Monitor"
-            items={symptoms}
+            items={symptoms.slice(0, 3)}
             icon={AlertCircle}
             iconColor="text-amber-400"
           />
           <AftercareSublist
-            label="Daily Reminders"
-            items={reminders}
-            icon={CheckCircle2}
-            iconColor="text-green-400"
+            label="Follow-up Appointments"
+            items={followups}
+            icon={CalendarClock}
+            iconColor="text-indigo-400"
           />
         </div>
       ) : (
@@ -250,7 +260,7 @@ function AftercareSection({ aftercare }) {
 // ── Issues / Questions ──────────────────────────────────────────
 
 function IssuesSection({ issues }) {
-  const items = issues || [];
+  const items = (issues || []).slice(0, 3);
   return (
     <CollapsibleSection icon={Stethoscope} iconColor="text-purple-500" title="Ask Your Doctor" badge={items.length ? `${items.length}` : null} defaultOpen={false}>
       {items.length ? (
@@ -465,7 +475,44 @@ function OnboardingScreen({ onComplete }) {
 
 // ── Main App ────────────────────────────────────────────────────
 
+const MYCHART_PATTERNS = [
+  'mychart.com',
+  'mychart.org',
+  'localhost:3000/api/mychart',
+];
+
+function isMyChartUrl(url) {
+  return MYCHART_PATTERNS.some((p) => url.includes(p));
+}
+
+function NotOnMyChartScreen() {
+  return (
+    <div className="w-full min-h-screen bg-gray-50 p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Stethoscope className="h-5 w-5 text-blue-600" />
+        <h1 className="text-base font-bold text-gray-900">DouglasAI</h1>
+      </div>
+      <hr className="border-gray-200 mb-4" />
+      <Card className="p-5">
+        <div className="flex flex-col items-center text-center gap-3 py-6">
+          <FileText className="h-10 w-10 text-gray-300" />
+          <div>
+            <p className="text-sm font-medium text-gray-700">
+              Navigate to MyChart
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Open a MyChart page to get AI-powered insights
+              about your health records.
+            </p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function App() {
+  const [onMyChart, setOnMyChart] = useState(null); // null = checking
   const [onboarded, setOnboarded] = useState(null);
   const [state, setState] = useState('loading');
   const [insight, setInsight] = useState(null);
@@ -473,21 +520,35 @@ function App() {
   const [language, setLanguage] = useState('en');
   const [translating, setTranslating] = useState(false);
 
+  // Check tab URL, auth status, and restore cached insight
   useEffect(() => {
-    chrome.storage.local.get('douglasai_onboarded', (result) => {
-      if (result.douglasai_onboarded === true) {
-        chrome.runtime.sendMessage({ type: 'CHECK_AUTH' }, (res) => {
-          if (res && res.authenticated) {
-            setOnboarded(true);
-          } else {
-            chrome.storage.local.remove('douglasai_onboarded');
-            setOnboarded(false);
-          }
-        });
-      } else {
-        setOnboarded(false);
-      }
+    chrome.runtime.sendMessage({ type: 'GET_TAB_URL' }, (res) => {
+      setOnMyChart(isMyChartUrl(res?.url || ''));
     });
+
+    chrome.storage.local.get(
+      ['douglasai_onboarded', 'douglasai_insight'],
+      (result) => {
+        // Restore cached insight if available
+        if (result.douglasai_insight) {
+          setInsight(result.douglasai_insight);
+          setState('ready');
+        }
+
+        if (result.douglasai_onboarded === true) {
+          chrome.runtime.sendMessage({ type: 'CHECK_AUTH' }, (res) => {
+            if (res && res.authenticated) {
+              setOnboarded(true);
+            } else {
+              chrome.storage.local.remove('douglasai_onboarded');
+              setOnboarded(false);
+            }
+          });
+        } else {
+          setOnboarded(false);
+        }
+      },
+    );
   }, []);
 
   async function fetchInsight(lang) {
@@ -512,6 +573,7 @@ function App() {
         });
       });
       setInsight(response);
+      chrome.storage.local.set({ douglasai_insight: response });
       setState('ready');
 
       // Schedule medication reminders from aftercare data
@@ -568,6 +630,7 @@ function App() {
   function handleLogout() {
     chrome.runtime.sendMessage({ type: 'LOGOUT' }, () => {
       chrome.storage.local.remove('douglasai_onboarded');
+      chrome.storage.local.remove('douglasai_insight');
       setOnboarded(false);
       setInsight(null);
       setState('loading');
@@ -575,19 +638,27 @@ function App() {
   }
 
   useEffect(() => {
-    if (onboarded !== true) return;
+    if (onboarded !== true || !onMyChart) return;
     chrome.runtime.sendMessage({ type: 'HEALTH_CHECK' }, (res) => {
       if (res && res.ok) {
-        fetchInsight();
+        if (insight) {
+          // Already have data — only refresh the summary
+          setTranslating(true);
+          refreshSummary();
+        } else {
+          // First load — fetch everything
+          fetchInsight();
+        }
       } else {
         setError('Server is not running. Start it with: docker compose up');
         setState('error');
       }
     });
-  }, [onboarded]);
+  }, [onboarded, onMyChart]);
 
-  if (onboarded === null) return null;
+  if (onboarded === null || onMyChart === null) return null;
   if (!onboarded) return <OnboardingScreen onComplete={() => setOnboarded(true)} />;
+  if (!onMyChart) return <NotOnMyChartScreen />;
 
   return (
     <div className="w-full min-h-screen bg-gray-50 p-4">
@@ -610,7 +681,6 @@ function App() {
               onRefresh={() => refreshSummary()}
               loading={translating}
             />
-            <InsightsSection insights={insight.insights} />
             <AftercareSection aftercare={insight.aftercare} />
             <IssuesSection issues={insight.issues} />
             <ChatSection language={language} />

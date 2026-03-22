@@ -79,7 +79,8 @@ You MUST respond with valid JSON in this exact format:
       {"time": "9:00 PM", "label": "Bedtime", "meds": ["Atorvastatin 20mg"]}
     ],
     "symptoms_to_monitor": ["Symptom 1 to watch for and when to seek care", "Symptom 2", ...],
-    "daily_reminders": ["Stay hydrated — drink 8 glasses of water daily", "Reminder 2", ...]
+    "daily_reminders": ["Stay hydrated — drink 8 glasses of water daily", "Reminder 2", ...],
+    "follow_up_appointments": ["Appointment 1: who to see, when, and why", "Appointment 2", ...]
   },
   "issues": ["Question to discuss with doctor 1", "Question 2", ...]
 }`;
@@ -110,7 +111,14 @@ Please analyze the current document and provide:
    - "medication_schedule": An array of time-slot objects for a full daily schedule. Each object has: "time" (e.g. "6:30 AM"), "label" (e.g. "Wake up", "Breakfast", "Lunch", "Dinner", "Bedtime"), and "meds" (array of medication instructions for that slot). Order medications by when they must be taken, accounting for spacing rules (e.g. Omeprazole 30min before food). Group medications into ~5 time slots across the day. Include specific dosage and any instructions (with food, empty stomach, etc.).
    - "symptoms_to_monitor": Symptoms the patient should watch for given their conditions and medications, and when to seek urgent care
    - "daily_reminders": General wellness reminders like hydration, exercise, sleep — keep these practical and relevant to their conditions. Do NOT include appointment logistics, prescription pickups, or insurance reminders.
-4. "issues": Questions or important points the patient should raise with their doctor at their next visit
+   - "follow_up_appointments": ONLY include follow-up appointments that are explicitly mentioned in the visit notes or provider recommendations. Include who to see, when, and why. Do NOT invent or recommend appointments that are not stated in the data. If no follow-ups are mentioned, return an empty array.
+4. "issues": Cross-reference the patient's ENTIRE medical history to find things their doctors may have missed or that fell through the cracks across multiple providers. Specifically look for:
+   - Medications that one provider prescribed but another provider recommended stopping or flagged as harmful (this is the HIGHEST priority — list it first if found)
+   - Lab values with concerning trends over time (e.g. a value that was normal 6 months ago but is now high, or steadily worsening across multiple tests)
+   - Drug interactions or contraindications given the patient's current conditions
+   - Ordered follow-ups or tests that appear overdue based on the timeline
+   - Conditions that may be worsening based on recent labs but haven't been addressed in recent visit notes
+   Frame each issue as a SHORT question (1-2 sentences max). Be specific but concise — state the finding and the question, nothing more.
 ${languageInstruction}
 Respond with JSON only.`;
 
@@ -129,6 +137,7 @@ Respond with JSON only.`;
         medication_schedule: ac.medication_schedule || [],
         symptoms_to_monitor: ac.symptoms_to_monitor || [],
         daily_reminders: ac.daily_reminders || [],
+        follow_up_appointments: ac.follow_up_appointments || [],
       },
       issues: parsed.issues || [],
       pageTitle: currentPage?.title || 'Unknown page',
@@ -138,8 +147,15 @@ Respond with JSON only.`;
   return {
     summary: text,
     insights: [],
-    aftercare: { medication_schedule: [], symptoms_to_monitor: [], daily_reminders: [] },
-    issues: ['Could not parse structured response — showing raw output above.'],
+    aftercare: {
+      medication_schedule: [],
+      symptoms_to_monitor: [],
+      daily_reminders: [],
+      follow_up_appointments: [],
+    },
+    issues: [
+      'Could not parse structured response — showing raw output above.',
+    ],
     pageTitle: currentPage?.title || 'Unknown page',
   };
 }

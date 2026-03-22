@@ -96,6 +96,13 @@ chrome.action.onClicked.addListener((tab) => {
 // ── Message relay ──────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'GET_TAB_URL') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      sendResponse({ url: tabs[0]?.url || '' });
+    });
+    return true;
+  }
+
   if (message.type === 'PAGE_UPDATE') {
     fetch(`${API_BASE}/page-update`, {
       method: 'POST',
@@ -194,6 +201,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
+  }
+
+  if (message.type === 'DEMO_NOTIFICATION') {
+    chrome.notifications.create(`demo-${Date.now()}`, {
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: message.title || 'Medication Reminder',
+      message: message.message || '',
+      priority: 2,
+      requireInteraction: true,
+    });
+    return false;
   }
 
   if (message.type === 'SET_MED_REMINDERS') {

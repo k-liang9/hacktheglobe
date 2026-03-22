@@ -120,7 +120,7 @@ function summarizeFhirData(fhirData) {
 
   if (fhirData.visits && fhirData.visits.length) {
     const visitSummaries = fhirData.visits.map(
-      (v) => `${v.date} — ${v.type} (${v.provider}): ${v.summary.slice(0, 300)}...`,
+      (v) => `${v.date} — ${v.type} (${v.provider}):\n${v.summary}`,
     ).join('\n\n');
     parts.push(`Recent visit notes:\n${visitSummaries}`);
   }
